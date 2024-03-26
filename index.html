@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="bootstrap.min.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="jquery-min.js"></script>
+    <title>Doc find</title>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div
+          class="col-md-12 d-flex justify-content-center align-items-center"
+          id="input-file-container"
+        >
+          <div class="mb-3">
+            <label for="" class="form-label">Ajouter votre document pdf</label>
+            <input
+              type="file"
+              class="form-control"
+              placeholder="Ajouter votre document pdf"
+              name="doc-input"
+            />
+            <div class="text-center">
+              <div
+                class="d-none spinner-border pinner-border-sm text-primary doc-spinner"
+                role="status"
+              >
+                <span class="visually-hidden">Chargement...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 find-wrapper find-wrapper-content d-none">
+          <div class="card user-card">
+            <div class="card-body">
+              Votre document est enregister poser maintenant vos questions
+            </div>
+          </div>
+        </div>
+        <div class="col-12 find-wrapper find-wrapper-input d-none">
+          <div class="row g-3">
+            <div class="col-8">
+              <input
+                type="text"
+                value=""
+                class="form-control"
+                name="question"
+                placeholder="Posez votre question par rapport au document téléversé"
+              />
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-primary find-doc">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="feather feather-send"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      jQuery(document).ready(function ($) {
+        const API_URL = "http://127.0.0.1:4000/";
+        var doc_path = "";
+        /**
+         * file ajax request
+         * @param {string} url
+         * @param {object} data
+         * @param {function} cb_before
+         * @param {function} cb_success
+         */
+        function AjaxResquest(url, data, cb_before, cb_success, requestType="form") {
+          $.ajax({
+            url: url,
+            type: "POST",
+            data: data,
+            ...(requestType == 'form' && {contentType: false}),
+            ...(requestType == 'form' && {processData: false}),
+            ...(requestType == 'json' && {dataType: "json"}),
+            ...(requestType == 'json' && {cache: false}),
+            headers: {
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            beforeSend: function (response) {
+              cb_before(response);
+            },
+            complete: function (response) {
+              cb_success(response);
+            },
+          });
+        }
+
+        /**
+         * check files extensions
+         * @param files [String] file name
+         * @param ext [array] allowed extension
+         * @returns {Boolean} true
+         */
+        function check_files_ext(files, extensions = ["pdf"]) {
+          var re = new RegExp(`(.*?).(${extensions.join("|")})$`);
+          for (var index = 0; index < files.length; index++) {
+            if (!re.test(files[index].name)) {
+              return false;
+            }
+          }
+          return true;
+        }
+
+        /**
+         * response card render
+         * @param message {String}
+         * @param type {String} user/bot
+         * @return {String} html card
+         */
+
+        function cardRender(message, type = "user") {
+          return `<div class="card ${type=='user' ? 'user-card' : 'bot-card'}">
+                    <div class="card-body">
+                      ${message}
+                    </div>
+                  </div>`;
+        }
+
+        $("input[name=doc-input]").on("change", function () {
+          let input = $(this);
+          $("doc-spinner").removeClass("d-none");
+          let fd = new FormData();
+          let files = input[0].files;
+          if (check_files_ext(files)) {
+            for (var index = 0; index < files.length; index++) {
+              fd.append("fichiers", files[index]);
+            }
+          } else {
+            alert("Format du fichier incorrect");
+            return false;
+          }
+
+          AjaxResquest(
+            `${API_URL}media/`,
+            fd,
+            function (action) {},
+            function (response) {
+              let data = JSON.parse(response.responseText);
+              if (data.success == true) {
+                doc_path = data.docPath;
+                $("doc-spinner").addClass("d-none");
+                $("#input-file-container").addClass("d-none");
+                $(".find-wrapper").removeClass("d-none");
+              } else {
+                $("doc-spinner").addClass("d-none");
+                alert(
+                  "Une erreur est survenu veuillez reessayer ultérieurement!"
+                );
+              }
+            }
+          );
+        });
+
+        $("button.find-doc").on("click", function(e) {
+          const question = $("input[name=question]").val();
+          const oldplace = $("input[name=question]").attr("placeholder");
+          if (question == "") {
+            alert("Veuillez saisir votre question!")
+            return;
+          }
+          $("input[name=question]").val("");
+          $("input[name=question]").prop("disabled", true)
+          $("input[name=question]").attr("placeholder", "chargement...")
+          $("div.find-wrapper-content").append(cardRender(question))
+          AjaxResquest(
+            `${API_URL}find/`,
+            {question, doc: doc_path},
+            function (action) {},
+            function (response){
+              let data = JSON.parse(response.responseText);
+              if (data.success == true){
+                $("div.find-wrapper-content").append(cardRender(data.data[0]?.answer, "bot"))
+              }else{
+                alert("Ereur le requete a echoue")
+              }
+              $("input[name=question]").prop("disabled", false)
+              $("input[name=question]").attr("placeholder", oldplace)
+            },
+            'json'
+          )
+        })
+      });
+    </script>
+  </body>
+</html>

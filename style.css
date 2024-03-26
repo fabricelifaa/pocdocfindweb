@@ -1,0 +1,25 @@
+#input-file-container{
+    height: calc(100vh - 100px);
+}
+
+.find-wrapper-content{
+    height: calc(100vh - 70px)
+}
+
+body{
+    background-color: #212629;
+    color: #fff;
+}
+
+.user-card, .bot-card{
+    width: fit-content;
+    margin: 1rem 0;
+}
+
+.user-card{
+    background-color: #EAECEE;
+}
+
+.bot-card{
+    float: right;
+}
